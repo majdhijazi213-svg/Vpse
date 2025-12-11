@@ -1,0 +1,50 @@
+name: VPS
+on:
+  workflow_dispatch:
+
+jobs:
+  create-vps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Enable SSH
+        run: |
+          sudo apt update -y
+          sudo apt install -y openssh-server
+          echo "root:admin@123" | sudo chpasswd
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+          echo "SSH Ready"
+
+      - name: Install Desktop + XRDP
+        run: |
+          sudo apt install -y xfce4 xfce4-goodies xrdp dbus-x11
+          sudo systemctl enable xrdp
+          sudo systemctl restart xrdp
+          echo "XRDP Ready"
+
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=vps-${{ github.run_id }} --accept-routes --ssh
+          tsip=$(tailscale ip -4 | head -n 1)
+          echo "TAILSCALE_IP=$tsip" >> $GITHUB_ENV
+          echo "Tailscale IP: $tsip"
+
+      - name: Show Connection Info
+        run: |
+          echo "=============================="
+          echo " VPS READY!"
+          echo " SSH Login:"
+          echo " IP: $TAILSCALE_IP"
+          echo " User: root"
+          echo " Pass: admin@123"
+          echo "=============================="
+
+      - name: Keep Alive
+        run: |
+          while true; do
+            echo "[$(date)] VPS Running..."
+            sleep 300
+          done
